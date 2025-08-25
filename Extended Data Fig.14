@@ -1,0 +1,149 @@
+setwd("E:\\single cell")
+library(Seurat)
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+library(harmony)
+library(tidyverse)
+library(RColorBrewer)
+library(scales)
+##read data
+
+merged_harmony<-readRDS("ad_analysis.RDS")
+colnames(merged_harmony)
+
+##the marker of cell annotation
+
+DotPlot(merged_harmony,features = c("CX3CR1", "P2RY12", #MG
+                                    "GFAP", "AQP4", "ALDH1L1",#AST
+                                    "MAP2", "SYT1", "SNAP25",  #NEU
+                                    "MBP", "MOG", "MAG", #OLG
+                                    "CD3D", "CD2", "TRBC1", #T 
+                                    "CLDN5", "FLT1", "VWF",#ED
+                                    "PDGFRB", "RGS5","MCAM", #PR
+                                    "DCN","PDGFRA" #FIB
+                                    
+),group.by = "clusters")+coord_flip()
+
+##umap plot
+
+DimPlot(merged_harmony, reduction = "umap",
+group.by ="cell types",label = T)
+
+
+##feature plot
+
+total_CASP1<-FeaturePlot(merged_harmony, features ="CASP1",reduction = "umap")
+individual_CASP1<-FeaturePlot(merged_harmony, features ="CASP1",split.by="group",reduction = "umap")
+
+##propotion plot
+
+for (i in unique(merged_harmony@meta.data$group)) {
+              ss<-GetAssayData(subset(subset(merged_harmony,clusters=="1"),group==i),
+                               assay = "RNA", layer = "data")["CASP1", ]
+              expression_threshold <- 0.10
+              expressing_cells <- sum(ss > expression_threshold)
+              total_cells <- length(ss)
+              expression_proportion <- expressing_cells / total_cells * 100
+              print(paste("The percentage of",i,"is",expression_proportion))
+}
+
+df <- data.frame(
+  group = c("AD: E3/E3", "AD: E3/E4", "Ctrl: E3/E3", "Ctrl: E3/E4"),
+  value = c( 4.8, 11.9,3.0, 5.1),
+  color = c( "#33a02c", "#ff7f00","#1f78b4", "#e31a1c")
+)
+df2 <- df %>%
+  mutate(dummy = 100 - value) %>%
+  pivot_longer(cols = c("value", "dummy"),
+               names_to = "type", values_to = "percent") %>%
+  mutate(fill_col = ifelse(type == "value", color, "grey90"))
+inner_radius <- 1.5   
+outer_radius <- 2.5   
+ring_center  <- (inner_radius + outer_radius) / 20
+
+ggplot(df2, aes(x = outer_radius, y = percent, fill = fill_col)) +
+  geom_bar(stat = "identity", width = outer_radius - inner_radius, color = "white") +
+  coord_polar(theta = "y", start = 0, direction = -1) +
+  xlim(0, outer_radius + 0.5) +
+  facet_wrap(~group, ncol = 2) +
+  scale_fill_identity() +
+  geom_text(
+    data = df,
+    aes(x = ring_center, y = 0, label = paste0(value, "%")),
+    inherit.aes = FALSE,
+    size = 5, fontface = "bold"
+  ) +
+  theme_void() +
+  theme(
+    strip.text = element_text(size = 12, face = "italic")
+  )
+
+
+## dot plot
+
+target_gene <- "CASP1"
+plot_data <- merged@meta.data %>%
+  select(cell_types, group) %>%
+  mutate(Expression = FetchData(merged, vars = target_gene)[, 1]) %>%
+  group_by(cell_types, group) %>%
+  summarise(
+    Avg_Exp = mean(Expression),
+    Pct_Exp = 100 * mean(Expression > 0)
+  ) %>% ungroup()
+
+ggplot(plot_data, aes(x = group, y = cell_types, 
+                      size = Pct_Exp, color = Avg_Exp)) +
+  geom_point() +
+  scale_size_continuous(
+    name = "% of cells",
+    range = c(1, 8),
+    limits = c(0, max(plot_data$Pct_Exp, na.rm = TRUE) * 1.1),
+    breaks = pretty_breaks(4)
+  ) +
+  scale_color_gradient(
+    name = "Avg expression",
+    low = "#ffffff", 
+    high = "#ff2913",
+    limits = c(0, max(plot_data$Avg_Exp, na.rm = TRUE) * 1.1),
+    guide = guide_colorbar(
+      barwidth = 0.8,
+      barheight = 4
+    )
+  ) +
+  labs(
+    title = paste(target_gene, "Expression in Clusters by group"),
+    x = NULL,
+    y = NULL
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    legend.position = "right",
+    legend.title = element_text(face = "bold", size = 10, vjust = 1),
+    legend.text = element_text(size = 9)
+    )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
