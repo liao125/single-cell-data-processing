@@ -84,9 +84,9 @@ ggplot(df2, aes(x = outer_radius, y = percent, fill = fill_col)) +
 ## dot plot
 
 target_gene <- "CASP1"
-plot_data <- merged@meta.data %>%
+plot_data <- merged_harmony@meta.data %>%
   select(cell_types, group) %>%
-  mutate(Expression = FetchData(merged, vars = target_gene)[, 1]) %>%
+  mutate(Expression = FetchData(merged_harmony, vars = target_gene)[, 1]) %>%
   group_by(cell_types, group) %>%
   summarise(
     Avg_Exp = mean(Expression),
